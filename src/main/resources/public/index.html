@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>McPanel – Panel administratora</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="bg-block"></div>
+<div class="bg-glow"></div>
+
+<div class="hud">
+    <div class="hud-item">
+        <span class="hud-label">GRACZE</span>
+        <span class="hud-value" id="hudPlayers">0/0</span>
+    </div>
+    <div class="hud-item">
+        <span class="hud-label">TPS</span>
+        <span class="hud-value" id="hudTps">20.0</span>
+    </div>
+</div>
+
+<div class="panel-wrapper">
+    <div class="panel-card">
+        <div class="panel-header">
+            <h1>McPanel</h1>
+            <p>Zaawansowany panel administratora Paper 1.19.2</p>
+        </div>
+
+
+        <div class="hero-stats">
+            <div class="hero-card hero-card-main">
+                <div class="hero-label">STATUS SERWERA</div>
+                <div class="hero-main-value">
+                    <span id="heroPlayersCurrent">0</span>
+                    <span class="hero-separator">/</span>
+                    <span id="heroPlayersMax">0</span>
+                </div>
+                <div class="hero-sub">Graczy online</div>
+                <div class="hero-bar">
+                    <div class="hero-bar-fill" id="heroPlayersBar"></div>
+                </div>
+            </div>
+            <div class="hero-card">
+                <div class="hero-label">TPS</div>
+                <div class="hero-main-value">
+                    <span id="heroTpsValue">20.0</span>
+                </div>
+                <div class="hero-sub" id="heroTpsStatus">Stabilny</div>
+                <div class="hero-bar hero-bar-tps">
+                    <div class="hero-bar-fill" id="heroTpsBar"></div>
+                </div>
+            </div>
+            <div class="hero-card">
+                <div class="hero-label">GRACZE</div>
+                <div class="hero-main-value">
+                    <span id="heroPlayerCount">0</span>
+                </div>
+                <div class="hero-sub">Zarejestrowanych kont</div>
+            </div>
+            <div class="hero-card">
+                <div class="hero-label">RANGI</div>
+                <div class="hero-main-value">
+                    <span id="heroRankCount">0</span>
+                </div>
+                <div class="hero-sub">Zdefiniowanych rang</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="overview">Przegląd ogólny</button>
+            <button class="tab" data-tab="stats">Statystyki</button>
+            <button class="tab" data-tab="ranks">Permisje &amp; Rangi</button>
+            <button class="tab" data-tab="other">Inne</button>
+        </div>
+
+        <div class="tabs-content">
+            <section class="tab-content active" id="tab-overview">
+                <h2>Przegląd ogólny</h2>
+                <div class="overview-grid">
+                    <div class="card-small">
+                        <span class="card-label">Graczy online</span>
+                        <span class="card-value" id="ovPlayers">0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">Maks. graczy</span>
+                        <span class="card-value" id="ovMaxPlayers">0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">TPS</span>
+                        <span class="card-value" id="ovTps">20.0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">Zarejestrowanych graczy</span>
+                        <span class="card-value" id="ovPlayerCount">0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">Zdefiniowanych rang</span>
+                        <span class="card-value" id="ovRankCount">0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">Łączna liczba wiadomości</span>
+                        <span class="card-value" id="ovMessages">0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">Bany (łączna liczba)</span>
+                        <span class="card-value" id="ovBans">0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">HELP-OP</span>
+                        <span class="card-value" id="ovHelpop">0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">WAR</span>
+                        <span class="card-value" id="ovWar">0</span>
+                    </div>
+                </div>
+
+                <div class="card-large">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-label">Status serwera</div>
+                            <div class="card-title">Liczba graczy (live)</div>
+                        </div>
+                        <div class="card-badge">Live</div>
+                    </div>
+                    <canvas id="onlineChart" height="160"></canvas>
+                </div>
+            </section>
+
+            <section class="tab-content" id="tab-stats">
+                <h2>Statystyki graczy</h2>
+                <div class="filters">
+                    <label>
+                        Ranga:
+                        <select id="statsRankFilter">
+                            <option value="">Wszystkie</option>
+                        </select>
+                    </label>
+                    <input type="text" id="statsSearch" placeholder="Szukaj po nicku...">
+                </div>
+                <div class="filters">
+                    <div id="statsRankChecks" class="checks-row"></div>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Nick</th>
+                            <th>Ranga</th>
+                            <th>Zabójstwa</th>
+                            <th>Zgony</th>
+                            <th>Czas gry (min)</th>
+                            <th>Bany</th>
+                            <th>Muty</th>
+                            <th>Ostrzeżenia</th>
+                        </tr>
+                        </thead>
+                        <tbody id="statsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="playerDrawer" class="drawer">
+                    <div class="drawer-left">
+                        <img id="drawerAvatar" alt="avatar gracza">
+                        <div class="drawer-name" id="drawerName"></div>
+                        <div class="drawer-rank" id="drawerRank"></div>
+                        <div class="drawer-bars" id="drawerBars"></div>
+                    </div>
+                    <div class="drawer-right">
+                        <div class="drawer-grid">
+                            <div><span>Kill</span><strong id="drawerKills">0</strong></div>
+                            <div><span>Zgony</span><strong id="drawerDeaths">0</strong></div>
+                            <div><span>Czas gry</span><strong id="drawerPlaytime">0</strong></div>
+                            <div><span>Bany</span><strong id="drawerBans">0</strong></div>
+                            <div><span>Muty</span><strong id="drawerMutes">0</strong></div>
+                            <div><span>Warny</span><strong id="drawerWarns">0</strong></div>
+                            <div><span>HELP-OP</span><strong id="drawerHelpop">0</strong></div>
+                            <div><span>WAR</span><strong id="drawerWar">0</strong></div>
+                        </div>
+                        <div class="drawer-actions">
+                            <select id="drawerRankSelect"></select>
+                            <button id="drawerAddRank">Nadaj rangę</button>
+                            <button id="drawerRemoveRank" class="ghost">Usuń (default)</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="tab-content" id="tab-ranks">
+                <h2>Permisje &amp; Rangi</h2>
+                <div class="ranks-layout">
+                    <div class="ranks-list">
+                        <h3>Lista rang</h3>
+                        <ul id="ranksList"></ul>
+                    </div>
+                    <div class="ranks-editor">
+                        <h3>Nowa / edycja rangi</h3>
+                        <form id="rankForm">
+                            <div class="field">
+                                <label>Nazwa rangi</label>
+                                <input type="text" id="rankName" required>
+                            </div>
+                            <div class="field">
+                                <label>Kolor rangi</label>
+                                <input type="text" id="rankColor" placeholder="&a lub #55ff55">
+                                <div class="color-painter">
+                                    <div id="rankColorPalette" class="color-palette"></div>
+                                    <div class="color-tools">
+                                        <div class="color-preview-block">
+                                            <span class="color-preview-label">Podgląd</span>
+                                            <div id="rankColorPreview" class="rank-color-preview">[VIP] Nick</div>
+                                        </div>
+                                        <label class="color-picker-label">
+                                            <span>Dowolny kolor (HEX)</span>
+                                            <input type="color" id="rankColorPicker" value="#55ff55">
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>Display name</label>
+                                <input type="text" id="rankDisplay" placeholder="&aVIP &7[MC]">
+                            </div>
+                            <div class="field">
+                                <label>Permisje (po jednej na linię)</label>
+                                <textarea id="rankPerms" rows="5" placeholder="minecraft.command.kick
+plugin.panel.open"></textarea>
+                                <div id="quickPermsContainer" class="quick-perms"></div>
+                            </div>
+                            <button type="submit">Zapisz rangę</button>
+                        </form>
+                        <div class="form-status" id="rankFormStatus"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="tab-content" id="tab-other">
+                <h2>Inne</h2>
+                <div class="other-grid">
+                    <div class="card-small full">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-label">Panel boczny w grze</div>
+                                <div class="card-title">Konfiguracja HUD</div>
+                            </div>
+                        </div>
+                        <div class="other-form">
+                            <label class="switch-row">
+                                <input type="checkbox" id="toggleSidebar">
+                                <span>Włącz/wyłącz panel po prawej</span>
+                            </label>
+                            <label>
+                                Tytuł
+                                <input type="text" id="sidebarTitle" placeholder="McPanel">
+                            </label>
+                            <label>
+                                Kolor akcentu (&kody lub HEX)
+                                <input type="text" id="sidebarAccent" placeholder="&b">
+                            </label>
+                            <button id="saveUiConfig">Zapisz ustawienia</button>
+                        </div>
+                    </div>
+                    <div class="card-small full">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-label">Historia HELPOP</div>
+                                <div class="card-title">Ostatnie zgłoszenia</div>
+                            </div>
+                        </div>
+                        <ul id="helpopHistory" class="history-list"></ul>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
