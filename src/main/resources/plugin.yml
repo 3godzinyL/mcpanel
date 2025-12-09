@@ -1,0 +1,29 @@
+name: McPanel
+main: com.example.mcpanel.MainPlugin
+version: 1.0.0
+api-version: 1.19
+author: 3godziny
+description: Paper 1.19.2 plugin with web admin panel in Kotlin/Ktor
+
+commands:
+  start:
+    description: Inicjalizacja panelu i plików konfiguracyjnych
+    usage: /start
+    permission: op
+  rangi:
+    description: Wyświetla listę rang
+    usage: /rangi
+  staty:
+    description: Wyświetla statystyki gracza
+    usage: /staty
+  rangaadd:
+    description: Ustawia rangę graczowi
+    usage: /rangaadd <nick> <ranga>
+    permission: op
+  rangausun:
+    description: Usuwa rangę graczowi (resetuje do default)
+    usage: /rangausun <nick>
+    permission: op
+  mcpanel:
+    description: Zarządzanie pluginem McPanel
+    usage: /mcpanel <reload|status>
