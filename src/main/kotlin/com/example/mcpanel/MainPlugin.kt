@@ -1,6 +1,8 @@
 @file:Suppress("DEPRECATION")
 package com.example.mcpanel
 
+import com.example.mcpanel.model.HelpopEntry
+import com.example.mcpanel.model.WarEntry
 import com.example.mcpanel.storage.DataService
 import com.example.mcpanel.storage.PanelConfigService
 import com.example.mcpanel.web.PanelWebServer
@@ -22,6 +24,7 @@ import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.scoreboard.DisplaySlot
 import org.bukkit.scoreboard.Team
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -49,6 +52,7 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
 
         panelConfig.load()
         dataService.load()
+        dataService.ensureData()
 
         // Callback do odświeżania rang po reload danych
         dataService.onDataReloaded = {
@@ -60,7 +64,7 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
         getCommand("start")?.setExecutor(this)
         getCommand("rangi")?.setExecutor(this)
         getCommand("staty")?.setExecutor(this)
-        getCommand("rangaadd")?.apply {
+        getCommand("ranganadaj")?.apply {
             setExecutor(this@MainPlugin)
             tabCompleter = this@MainPlugin
         }
@@ -68,6 +72,9 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
             setExecutor(this@MainPlugin)
             tabCompleter = this@MainPlugin
         }
+        getCommand("helpop")?.setExecutor(this)
+        getCommand("anshelpop")?.setExecutor(this)
+        getCommand("war")?.setExecutor(this)
         getCommand("mcpanel")?.apply {
             setExecutor(this@MainPlugin)
             tabCompleter = this@MainPlugin
@@ -111,8 +118,11 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
             "start" -> handleStart(sender)
             "rangi" -> handleRangi(sender)
             "staty" -> handleStaty(sender)
-            "rangaadd" -> handleRangaAdd(sender, args)
+            "ranganadaj" -> handleRangaNadawanie(sender, args)
             "rangausun" -> handleRangaUsun(sender, args)
+            "helpop" -> handleHelpop(sender, args)
+            "anshelpop" -> handleAnswerHelpop(sender, args)
+            "war" -> handleWar(sender, args)
             "mcpanel" -> handleMcPanel(sender, args)
             else -> false
         }
@@ -296,7 +306,7 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
         return true
     }
 
-    private fun handleRangaAdd(sender: CommandSender, args: Array<out String>): Boolean {
+    private fun handleRangaNadawanie(sender: CommandSender, args: Array<out String>): Boolean {
         if (!sender.isOp) {
             sender.sendMessage("${ChatColor.RED}Tylko operator może zmieniać rangi.")
             return true
@@ -307,7 +317,7 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
             return true
         }
         if (args.size < 2) {
-            sender.sendMessage("${ChatColor.RED}Użycie: ${ChatColor.YELLOW}/rangaadd <nick> <ranga>")
+            sender.sendMessage("${ChatColor.RED}Użycie: ${ChatColor.YELLOW}/ranganadaj <nick> <ranga>")
             sender.sendMessage("${ChatColor.GRAY}Dostępne rangi: ${data.ranks.joinToString(", ") { it.name }}")
             return true
         }
@@ -329,7 +339,7 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
         stats.rank = rank.name
         dataService.save()
 
-        val rankPrefix = ChatColor.translateAlternateColorCodes('&', rank.prefix)
+        val rankPrefix = ChatColor.translateAlternateColorCodes('&', rank.prefix.ifEmpty { rank.color })
         sender.sendMessage("${ChatColor.GREEN}✔ Ustawiono rangę $rankPrefix${rank.name} ${ChatColor.GREEN}dla ${ChatColor.WHITE}$nick")
         
         if (offline.isOnline) {
@@ -341,6 +351,7 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
                 updatePlayerRankDisplay(onlinePlayer)
             }
         }
+        refreshAllPlayerRanks()
         return true
     }
 
@@ -354,12 +365,14 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
             sender.sendMessage("${ChatColor.RED}Panel nie jest zainicjalizowany. Użyj /start")
             return true
         }
-        if (args.isEmpty()) {
-            sender.sendMessage("${ChatColor.RED}Użycie: ${ChatColor.YELLOW}/rangausun <nick>")
+        if (args.size < 2) {
+            sender.sendMessage("${ChatColor.RED}Użycie: ${ChatColor.YELLOW}/rangausun <nick> <ranga>")
+            sender.sendMessage("${ChatColor.GRAY}Dostępne rangi: ${data.ranks.joinToString(", ") { it.name }}")
             return true
         }
 
         val nick = args[0]
+        val rankName = args[1]
         val offline = Bukkit.getOfflinePlayer(nick)
         val uuid = offline.uniqueId.toString()
 
@@ -369,13 +382,17 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
             return true
         }
 
-        val oldRank = stats.rank
+        if (!stats.rank.equals(rankName, ignoreCase = true)) {
+            sender.sendMessage("${ChatColor.YELLOW}Gracz ${ChatColor.WHITE}$nick ${ChatColor.YELLOW}nie ma rangi ${ChatColor.WHITE}$rankName")
+            return true
+        }
+
         val defaultRank = data.ranks.find { it.name.equals("default", ignoreCase = true) }?.name ?: "default"
         
         stats.rank = defaultRank
         dataService.save()
 
-        sender.sendMessage("${ChatColor.GREEN}✔ Usunięto rangę ${ChatColor.YELLOW}$oldRank ${ChatColor.GREEN}graczowi ${ChatColor.WHITE}$nick")
+        sender.sendMessage("${ChatColor.GREEN}✔ Usunięto rangę ${ChatColor.YELLOW}$rankName ${ChatColor.GREEN}graczowi ${ChatColor.WHITE}$nick")
         sender.sendMessage("${ChatColor.GRAY}Przypisano domyślną rangę: ${ChatColor.WHITE}$defaultRank")
         
         if (offline.isOnline) {
@@ -387,6 +404,123 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
                 updatePlayerRankDisplay(onlinePlayer)
             }
         }
+        refreshAllPlayerRanks()
+        return true
+    }
+
+    private fun handleHelpop(sender: CommandSender, args: Array<out String>): Boolean {
+        if (args.isEmpty()) {
+            sender.sendMessage("${ChatColor.YELLOW}Użycie: /helpop <wiadomość>")
+            return true
+        }
+        val msg = args.joinToString(" ").trim()
+        val name = sender.name
+
+        val entry = HelpopEntry(
+            sender = name,
+            uuid = if (sender is Player) sender.uniqueId.toString() else "console",
+            message = msg,
+            timestamp = System.currentTimeMillis()
+        )
+        dataService.appendHelpop(entry)
+
+        if (sender is Player) {
+            val stats = dataService.getOrCreatePlayerStats(sender.uniqueId.toString(), sender.name)
+            stats.helpopSent += 1
+            dataService.save()
+        }
+
+        val comp = TextComponent("${ChatColor.DARK_PURPLE}[HELP-OP] ${ChatColor.WHITE}$name${ChatColor.GRAY}: ${ChatColor.LIGHT_PURPLE}$msg")
+        comp.clickEvent = ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/anshelpop $name ")
+        comp.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT,
+            ComponentBuilder("${ChatColor.GREEN}Kliknij aby odpowiedzieć").create())
+
+        Bukkit.getOnlinePlayers()
+            .filter { it.isOp || it.hasPermission("mcpanel.helpop.receive") || it.hasPermission("mcpanel.anshelpop") }
+            .forEach { it.spigot().sendMessage(comp) }
+
+        sender.sendMessage("${ChatColor.GREEN}✔ ${ChatColor.GRAY}Wysłano prośbę do administracji.")
+        return true
+    }
+
+    private fun handleAnswerHelpop(sender: CommandSender, args: Array<out String>): Boolean {
+        if (sender !is Player && !sender.isOp) {
+            sender.sendMessage("${ChatColor.RED}Tylko administracja może odpowiadać na helpop.")
+            return true
+        }
+        if (sender is Player && !sender.hasPermission("mcpanel.anshelpop") && !sender.isOp) {
+            sender.sendMessage("${ChatColor.RED}Brak uprawnień do odpowiadania na helpop.")
+            return true
+        }
+        if (args.size < 2) {
+            sender.sendMessage("${ChatColor.YELLOW}Użycie: /anshelpop <nick> <wiadomość>")
+            return true
+        }
+        val targetNick = args[0]
+        val message = args.drop(1).joinToString(" ").trim()
+        val target = Bukkit.getPlayerExact(targetNick)
+        if (target == null) {
+            sender.sendMessage("${ChatColor.RED}Gracz ${ChatColor.WHITE}$targetNick ${ChatColor.RED}nie jest online.")
+            return true
+        }
+
+        target.sendTitle("${ChatColor.DARK_PURPLE}HELP-OP", "${ChatColor.LIGHT_PURPLE}$message", 10, 80, 20)
+        target.sendMessage("${ChatColor.DARK_PURPLE}[HELP-OP] ${ChatColor.WHITE}${sender.name}${ChatColor.GRAY}: ${ChatColor.LIGHT_PURPLE}$message")
+
+        if (sender is Player) {
+            val adminStats = dataService.getOrCreatePlayerStats(sender.uniqueId.toString(), sender.name)
+            adminStats.helpopAnswered += 1
+            dataService.save()
+        }
+
+        // zaznacz w logu
+        val log = dataService.data?.helpopLog
+        log?.lastOrNull { it.sender.equals(targetNick, ignoreCase = true) && it.answer == null }?.let { entry ->
+            val updated = entry.copy(answeredBy = sender.name, answer = message)
+            log.remove(entry)
+            log.add(updated)
+            dataService.save()
+        }
+
+        sender.sendMessage("${ChatColor.GREEN}✔ ${ChatColor.GRAY}Wysłano odpowiedź do ${ChatColor.WHITE}$targetNick")
+        return true
+    }
+
+    private fun handleWar(sender: CommandSender, args: Array<out String>): Boolean {
+        if (!sender.isOp && (sender !is Player || !sender.hasPermission("mcpanel.war"))) {
+            sender.sendMessage("${ChatColor.RED}Brak uprawnień do /war.")
+            return true
+        }
+        if (args.size < 2) {
+            sender.sendMessage("${ChatColor.YELLOW}Użycie: /war <nick> <wiadomość>")
+            return true
+        }
+        val targetNick = args[0]
+        val message = args.drop(1).joinToString(" ").trim()
+        val target = Bukkit.getPlayerExact(targetNick)
+        if (target == null) {
+            sender.sendMessage("${ChatColor.RED}Gracz ${ChatColor.WHITE}$targetNick ${ChatColor.RED}nie jest online.")
+            return true
+        }
+
+        target.sendTitle("${ChatColor.DARK_RED}OSTRZEŻENIE", "${ChatColor.GRAY}$message", 10, 80, 20)
+        target.sendMessage("${ChatColor.DARK_RED}[WARN] ${ChatColor.GRAY}$message")
+
+        val warEntry = WarEntry(
+            sender = sender.name,
+            target = target.name,
+            message = message,
+            timestamp = System.currentTimeMillis()
+        )
+        dataService.appendWar(warEntry)
+
+        if (sender is Player) {
+            val adminStats = dataService.getOrCreatePlayerStats(sender.uniqueId.toString(), sender.name)
+            adminStats.warSent += 1
+            dataService.save()
+        }
+
+        sender.sendMessage("${ChatColor.GREEN}✔ ${ChatColor.GRAY}Wysłano ostrzeżenie do ${ChatColor.WHITE}${target.name}")
         return true
     }
 
@@ -403,10 +537,9 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
         val data = dataService.data ?: return mutableListOf()
 
         return when (command.name.lowercase()) {
-            "rangaadd" -> {
+            "ranganadaj" -> {
                 when (args.size) {
                     1 -> {
-                        // Pierwszy argument - nick gracza (online gracze)
                         val partial = args[0].lowercase()
                         Bukkit.getOnlinePlayers()
                             .map { it.name }
@@ -414,7 +547,6 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
                             .toMutableList()
                     }
                     2 -> {
-                        // Drugi argument - nazwa rangi
                         val partial = args[1].lowercase()
                         data.ranks
                             .map { it.name }
@@ -427,19 +559,32 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
             "rangausun" -> {
                 when (args.size) {
                     1 -> {
-                        // Gracze którzy mają rangę inną niż default
                         val partial = args[0].lowercase()
                         val playersWithRanks = data.players.values
                             .filter { !it.rank.equals("default", ignoreCase = true) }
                             .map { it.name }
-                        
-                        // Dodaj też online graczy
                         val online = Bukkit.getOnlinePlayers().map { it.name }
                         (playersWithRanks + online)
                             .distinct()
                             .filter { it.lowercase().startsWith(partial) }
                             .toMutableList()
                     }
+                    2 -> {
+                        val partial = args[1].lowercase()
+                        data.ranks
+                            .map { it.name }
+                            .filter { it.lowercase().startsWith(partial) }
+                            .toMutableList()
+                    }
+                    else -> mutableListOf()
+                }
+            }
+            "anshelpop", "war" -> {
+                when (args.size) {
+                    1 -> Bukkit.getOnlinePlayers()
+                        .map { it.name }
+                        .filter { it.lowercase().startsWith(args[0].lowercase()) }
+                        .toMutableList()
                     else -> mutableListOf()
                 }
             }
@@ -473,9 +618,13 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
         
         // Display name (czat i inne)
         player.setDisplayName("$prefix${player.name}${ChatColor.RESET}")
+        player.customName = "$prefix${player.name}${ChatColor.RESET}"
+        player.isCustomNameVisible = true
         
         // Scoreboard team dla nazwy nad głową
         setupScoreboardTeam(player, rank.name, rank.priority, prefix, suffix)
+
+        updateSidebar(player)
     }
 
     private fun setupScoreboardTeam(player: Player, rankName: String, priority: Int, prefix: String, suffix: String) {
@@ -508,6 +657,47 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
         player.scoreboard = scoreboard
     }
 
+    private fun updateSidebar(player: Player) {
+        if (!panelConfig.sidebarEnabled) {
+            return
+        }
+        val manager = Bukkit.getScoreboardManager()
+        val scoreboard = manager.mainScoreboard
+        val titleColor = ChatColor.translateAlternateColorCodes('&', panelConfig.sidebarAccent)
+        val objective = scoreboard.getObjective("mcp_info")
+            ?: scoreboard.registerNewObjective(
+                "mcp_info",
+                "dummy",
+                "${titleColor}${panelConfig.sidebarTitle}"
+            )
+        objective.displaySlot = DisplaySlot.SIDEBAR
+
+        // wyczyść poprzednie linie sidebaru (tylko te nasze)
+        runCatching { scoreboard.entries.toList() }.getOrDefault(emptyList()).forEach { entry ->
+            runCatching { scoreboard.resetScores(entry) }
+        }
+
+        val rank = dataService.getPlayerRank(player.uniqueId.toString())
+        val rankDisplay = rank?.let {
+            ChatColor.translateAlternateColorCodes('&', it.prefix.ifEmpty { it.color } + it.name)
+        } ?: "${ChatColor.GRAY}brak"
+
+        val lines = listOf(
+            "${ChatColor.DARK_GRAY}⧽⧽⧽⧽⧽⧽⧽⧽",
+            "${ChatColor.GRAY}Serwer: ${ChatColor.AQUA}${panelConfig.sidebarTitle}",
+            "${ChatColor.GRAY}Online: ${ChatColor.GREEN}${Bukkit.getOnlinePlayers().size}",
+            "${ChatColor.GRAY}Ranga: $rankDisplay",
+            "${ChatColor.GRAY}Ping: ${ChatColor.WHITE}${player.ping} ms",
+            "${ChatColor.DARK_GRAY}⧼⧼⧼⧼⧼⧼⧼⧼"
+        )
+
+        var score = lines.size
+        lines.forEach { line ->
+            objective.getScore(line.take(40)).score = score--
+        }
+        player.scoreboard = scoreboard
+    }
+
     private fun getLastColor(text: String): ChatColor {
         val translated = ChatColor.translateAlternateColorCodes('&', text)
         val lastColorIndex = translated.lastIndexOf('§')
@@ -527,7 +717,7 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
 
     private fun startPanelIfNeeded() {
         if (!::panelServer.isInitialized) {
-            panelServer = PanelWebServer(this, dataService)
+            panelServer = PanelWebServer(this, dataService, panelConfig)
             panelServer.start()
         }
     }
@@ -546,6 +736,7 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
         val player = event.player
         val now = System.currentTimeMillis()
         sessionJoinTimes[player.uniqueId] = now
+        dataService.recordJoin(now)
 
         dataService.data ?: return
         dataService.getOrCreatePlayerStats(player.uniqueId.toString(), player.name)
@@ -553,6 +744,7 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
         // Ustaw rangę z małym opóźnieniem
         Bukkit.getScheduler().runTaskLater(this, Runnable {
             updatePlayerRankDisplay(player)
+            updateSidebar(player)
         }, 5L)
     }
 
@@ -577,6 +769,7 @@ class MainPlugin : JavaPlugin(), Listener, CommandExecutor, TabCompleter {
             return
         }
         
+        dataService.incrementMessageCounter()
         val player = event.player
         val rank = dataService.getPlayerRank(player.uniqueId.toString()) ?: return
         

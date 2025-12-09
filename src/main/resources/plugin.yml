@@ -16,14 +16,25 @@ commands:
   staty:
     description: Wyświetla statystyki gracza
     usage: /staty
-  rangaadd:
+  ranganadaj:
     description: Ustawia rangę graczowi
-    usage: /rangaadd <nick> <ranga>
+    usage: /ranganadaj <nick> <ranga>
     permission: op
   rangausun:
-    description: Usuwa rangę graczowi (resetuje do default)
-    usage: /rangausun <nick>
+    description: Usuwa wskazaną rangę graczowi (reset do default)
+    usage: /rangausun <nick> <ranga>
     permission: op
+  helpop:
+    description: Wyślij prośbę do administracji
+    usage: /helpop <wiadomość>
+  anshelpop:
+    description: Odpowiedź na helpop
+    usage: /anshelpop <nick> <wiadomość>
+    permission: mcpanel.anshelpop
+  war:
+    description: Wyślij ostrzeżenie (czarny ekran) graczowi
+    usage: /war <nick> <wiadomość>
+    permission: mcpanel.war
   mcpanel:
     description: Zarządzanie pluginem McPanel
     usage: /mcpanel <reload|status>

@@ -12,6 +12,10 @@ const ovMaxPlayers = document.getElementById("ovMaxPlayers");
 const ovTps = document.getElementById("ovTps");
 const ovPlayerCount = document.getElementById("ovPlayerCount");
 const ovRankCount = document.getElementById("ovRankCount");
+const ovMessages = document.getElementById("ovMessages");
+const ovBans = document.getElementById("ovBans");
+const ovHelpop = document.getElementById("ovHelpop");
+const ovWar = document.getElementById("ovWar");
 
 // Hero – duże statystyki na wejściu
 const heroPlayersCurrent = document.getElementById("heroPlayersCurrent");
@@ -29,6 +33,23 @@ const heroRankCount = document.getElementById("heroRankCount");
 const statsRankFilter = document.getElementById("statsRankFilter");
 const statsSearch = document.getElementById("statsSearch");
 const statsTableBody = document.getElementById("statsTableBody");
+const statsRankChecks = document.getElementById("statsRankChecks");
+const playerDrawer = document.getElementById("playerDrawer");
+const drawerAvatar = document.getElementById("drawerAvatar");
+const drawerName = document.getElementById("drawerName");
+const drawerRank = document.getElementById("drawerRank");
+const drawerKills = document.getElementById("drawerKills");
+const drawerDeaths = document.getElementById("drawerDeaths");
+const drawerPlaytime = document.getElementById("drawerPlaytime");
+const drawerBans = document.getElementById("drawerBans");
+const drawerMutes = document.getElementById("drawerMutes");
+const drawerWarns = document.getElementById("drawerWarns");
+const drawerHelpop = document.getElementById("drawerHelpop");
+const drawerWar = document.getElementById("drawerWar");
+const drawerPermSelect = document.getElementById("drawerRankSelect");
+const drawerBtnAdd = document.getElementById("drawerAddRank");
+const drawerBtnRemove = document.getElementById("drawerRemoveRank");
+const drawerBars = document.getElementById("drawerBars");
 
 /// ─────────────────────────────────────────────────────────────
 /// DOM ELEMENTY – RANGI
@@ -46,9 +67,20 @@ const rankColorPicker = document.getElementById("rankColorPicker");
 const rankColorPreview = document.getElementById("rankColorPreview");
 const quickPermsContainer = document.getElementById("quickPermsContainer");
 
+/// ─────────────────────────────────────────────────────────────
+/// DOM ELEMENTY – INNE
+/// ─────────────────────────────────────────────────────────────
+const toggleSidebar = document.getElementById("toggleSidebar");
+const sidebarTitleInput = document.getElementById("sidebarTitle");
+const sidebarAccentInput = document.getElementById("sidebarAccent");
+const helpopHistoryList = document.getElementById("helpopHistory");
+
 let allRanks = [];
 let allStats = [];
 let activeRankName = null;
+let onlineChart = null;
+let onlineLabels = [];
+let onlinePoints = [];
 
 /// ─────────────────────────────────────────────────────────────
 /// KONFIG – mapa kolorów Minecraft (&0–&f)
@@ -80,7 +112,10 @@ const QUICK_PERMS = [
     { perm: "minecraft.command.op", label: "OP / admin" },
     { perm: "minecraft.command.say", label: "Broadcast" },
     { perm: "minecraft.command.tps", label: "TPS / debug" },
-    { perm: "minecraft.command.time", label: "Czas świata" }
+    { perm: "minecraft.command.time", label: "Czas świata" },
+    { perm: "mcpanel.helpop.receive", label: "Helpop podgląd" },
+    { perm: "mcpanel.anshelpop", label: "Helpop odpowiedzi" },
+    { perm: "mcpanel.war", label: "Ostrzeżenia /war" }
 ];
 
 /// ─────────────────────────────────────────────────────────────
@@ -162,6 +197,10 @@ async function fetchOverview() {
         const tps = data.tps ?? 20.0;
         const rankCount = data.rankCount ?? 0;
         const playerCount = data.playerCount ?? 0;
+        const totalMessages = data.totalMessages ?? 0;
+        const totalBans = data.totalBans ?? 0;
+        const helpopCount = data.helpopCount ?? 0;
+        const warCount = data.warCount ?? 0;
 
         if (hudPlayers) hudPlayers.textContent = `${online}/${maxPlayers}`;
         if (hudTps) hudTps.textContent = tps;
@@ -171,10 +210,77 @@ async function fetchOverview() {
         if (ovTps) ovTps.textContent = tps;
         if (ovRankCount) ovRankCount.textContent = rankCount;
         if (ovPlayerCount) ovPlayerCount.textContent = playerCount;
+        if (ovMessages) ovMessages.textContent = totalMessages;
+        if (ovBans) ovBans.textContent = totalBans;
+        if (ovHelpop) ovHelpop.textContent = helpopCount;
+        if (ovWar) ovWar.textContent = warCount;
 
         updateHeroFromOverview({ online, maxPlayers, tps, rankCount, playerCount });
+        updateOnlineChart(online);
     } catch (e) {
         console.warn("overview fetch failed", e);
+    }
+}
+
+/// ─────────────────────────────────────────────────────────────
+/// WYKRES ONLINE (LIVE)
+/// ─────────────────────────────────────────────────────────────
+function updateOnlineChart(online) {
+    const ctx = document.getElementById("onlineChart");
+    if (!ctx) return;
+
+    const label = new Date().toLocaleTimeString("pl-PL", { hour12: false });
+    onlineLabels.push(label);
+    onlinePoints.push(online);
+
+    const maxPoints = 240; // ~20 minut przy odświeżaniu 5s
+    if (onlineLabels.length > maxPoints) {
+        onlineLabels.shift();
+        onlinePoints.shift();
+    }
+
+    if (!onlineChart) {
+        onlineChart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: onlineLabels,
+                datasets: [
+                    {
+                        label: "Gracze online",
+                        data: onlinePoints,
+                        borderColor: "rgba(94,234,212,0.9)",
+                        backgroundColor: "rgba(59,130,246,0.15)",
+                        borderWidth: 2,
+                        tension: 0.25,
+                        fill: true,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                animation: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: "#cbd5e1" },
+                        grid: { color: "rgba(148,163,184,0.15)" }
+                    },
+                    x: {
+                        ticks: { color: "#cbd5e1", maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: "#e2e8f0" } },
+                    tooltip: { mode: "nearest", intersect: false }
+                }
+            }
+        });
+    } else {
+        onlineChart.data.labels = onlineLabels;
+        onlineChart.data.datasets[0].data = onlinePoints;
+        onlineChart.update();
     }
 }
 
@@ -346,22 +452,59 @@ async function fetchStats() {
 }
 
 function renderRankFilter() {
-    if (!statsRankFilter) return;
-    const current = statsRankFilter.value;
     const ranks = uniqueArray(allRanks.map(r => r.name || "").filter(Boolean));
-    statsRankFilter.innerHTML = '<option value="">Wszystkie</option>';
-    ranks.forEach(name => {
-        const opt = document.createElement("option");
-        opt.value = name;
-        opt.textContent = name;
-        statsRankFilter.appendChild(opt);
-    });
-    statsRankFilter.value = current;
+
+    if (statsRankFilter) {
+        const current = statsRankFilter.value;
+        statsRankFilter.innerHTML = '<option value="">Wszystkie</option>';
+        ranks.forEach(name => {
+            const opt = document.createElement("option");
+            opt.value = name;
+            opt.textContent = name;
+            statsRankFilter.appendChild(opt);
+        });
+        statsRankFilter.value = current;
+    }
+
+    if (statsRankChecks) {
+        statsRankChecks.innerHTML = "";
+        const allLabel = document.createElement("label");
+        allLabel.className = "check-pill";
+        const allInput = document.createElement("input");
+        allInput.type = "checkbox";
+        allInput.checked = true;
+        allInput.dataset.value = "";
+        allLabel.appendChild(allInput);
+        allLabel.append("Wszyscy");
+        statsRankChecks.appendChild(allLabel);
+
+        ranks.forEach((name) => {
+            const label = document.createElement("label");
+            label.className = "check-pill";
+            const input = document.createElement("input");
+            input.type = "checkbox";
+            input.dataset.value = name;
+            input.checked = true;
+            label.appendChild(input);
+            label.append(name);
+            statsRankChecks.appendChild(label);
+        });
+
+        statsRankChecks.querySelectorAll("input").forEach((input) => {
+            input.addEventListener("change", renderStats);
+        });
+    }
 }
 
 function renderStats() {
     if (!statsTableBody) return;
     const filterRank = statsRankFilter ? statsRankFilter.value : "";
+    let activeRanks = [];
+    if (statsRankChecks) {
+        const checked = Array.from(statsRankChecks.querySelectorAll("input:checked"))
+            .map((i) => i.dataset.value || "");
+        activeRanks = checked.filter(Boolean);
+    }
     const search = statsSearch ? statsSearch.value.trim().toLowerCase() : "";
 
     statsTableBody.innerHTML = "";
@@ -369,6 +512,7 @@ function renderStats() {
         .slice()
         .sort((a, b) => (b.playTimeMs ?? 0) - (a.playTimeMs ?? 0))
         .filter(s => !filterRank || (s.rank || "") === filterRank)
+        .filter(s => activeRanks.length === 0 || activeRanks.includes(s.rank || ""))
         .filter(s => !search || (s.name || "").toLowerCase().includes(search))
         .forEach(stats => {
             const tr = document.createElement("tr");
@@ -406,8 +550,144 @@ function renderStats() {
             tr.appendChild(tdMutes);
             tr.appendChild(tdWarns);
 
+            tr.addEventListener("click", () => openDrawer(stats));
+
             statsTableBody.appendChild(tr);
         });
+}
+
+function minutesToHoursMinutes(ms) {
+    const minutes = Math.floor((ms ?? 0) / 1000 / 60);
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return `${hours}h ${rest}m`;
+}
+
+function openDrawer(stats) {
+    if (!playerDrawer) return;
+    playerDrawer.classList.add("open");
+    drawerName && (drawerName.textContent = stats.name || "");
+    drawerRank && (drawerRank.textContent = stats.rank || "");
+    drawerKills && (drawerKills.textContent = stats.kills ?? 0);
+    drawerDeaths && (drawerDeaths.textContent = stats.deaths ?? 0);
+    drawerPlaytime && (drawerPlaytime.textContent = minutesToHoursMinutes(stats.playTimeMs));
+    drawerBans && (drawerBans.textContent = stats.bans ?? 0);
+    drawerMutes && (drawerMutes.textContent = stats.mutes ?? 0);
+    drawerWarns && (drawerWarns.textContent = stats.warns ?? 0);
+    drawerHelpop && (drawerHelpop.textContent = stats.helpopSent ?? 0);
+    drawerWar && (drawerWar.textContent = stats.warSent ?? 0);
+
+    if (drawerAvatar) {
+        const url = `https://crafatar.com/avatars/${stats.uuid || "0000"}?size=160&overlay`;
+        drawerAvatar.src = url;
+    }
+
+    if (drawerPermSelect) {
+        drawerPermSelect.innerHTML = "";
+        allRanks.forEach((r) => {
+            const opt = document.createElement("option");
+            opt.value = r.name;
+            opt.textContent = r.name;
+            drawerPermSelect.appendChild(opt);
+        });
+        drawerPermSelect.value = stats.rank || "";
+    }
+
+    if (drawerBars) {
+        drawerBars.innerHTML = "";
+        const totalMinutes = Math.floor((stats.playTimeMs ?? 0) / 1000 / 60);
+        const perDay = Math.max(1, Math.floor(totalMinutes / 7));
+        for (let i = 0; i < 7; i++) {
+            const bar = document.createElement("div");
+            bar.className = "day-bar";
+            const height = Math.min(100, perDay / 5);
+            bar.style.height = `${height}%`;
+            bar.title = `Dzień ${i + 1}: ${perDay} min`;
+            drawerBars.appendChild(bar);
+        }
+    }
+
+    if (drawerBtnAdd && drawerPermSelect) {
+        drawerBtnAdd.onclick = async () => {
+            const rank = drawerPermSelect.value;
+            await updatePlayerRank(stats.uuid, rank);
+        };
+    }
+    if (drawerBtnRemove) {
+        drawerBtnRemove.onclick = async () => {
+            await updatePlayerRank(stats.uuid, "default");
+        };
+    }
+}
+
+async function updatePlayerRank(uuid, rank) {
+    try {
+        const res = await fetch(`/api/stats/${uuid}/rank`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rank })
+        });
+        if (res.ok) {
+            await fetchStats();
+            setRankFormStatus("Zmieniono rangę gracza", "ok");
+        } else {
+            setRankFormStatus("Nie udało się zmienić rangi", "error");
+        }
+    } catch (e) {
+        console.warn("update rank failed", e);
+        setRankFormStatus("Błąd przy zmianie rangi", "error");
+    }
+}
+
+/// ─────────────────────────────────────────────────────────────
+/// INNE – helpop historia i konfiguracja sidebaru
+/// ─────────────────────────────────────────────────────────────
+async function fetchHelpopHistory() {
+    try {
+        const res = await fetch("/api/helpop");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!Array.isArray(data) || !helpopHistoryList) return;
+        helpopHistoryList.innerHTML = "";
+        data.slice().reverse().forEach((item) => {
+            const li = document.createElement("li");
+            const date = new Date(item.timestamp || Date.now());
+            li.innerHTML = `<strong>${item.sender}</strong> → ${item.message} <span>${date.toLocaleTimeString()}</span>`;
+            helpopHistoryList.appendChild(li);
+        });
+    } catch (e) {
+        console.warn("helpop history fetch failed", e);
+    }
+}
+
+async function fetchUiConfig() {
+    try {
+        const res = await fetch("/api/config/ui");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (toggleSidebar) toggleSidebar.checked = !!data.sidebarEnabled;
+        if (sidebarTitleInput) sidebarTitleInput.value = data.sidebarTitle || "McPanel";
+        if (sidebarAccentInput) sidebarAccentInput.value = data.sidebarAccent || "&b";
+    } catch (e) {
+        console.warn("ui config fetch failed", e);
+    }
+}
+
+async function saveUiConfig() {
+    try {
+        const body = {
+            sidebarEnabled: toggleSidebar ? toggleSidebar.checked : true,
+            sidebarTitle: sidebarTitleInput ? sidebarTitleInput.value : "McPanel",
+            sidebarAccent: sidebarAccentInput ? sidebarAccentInput.value : "&b"
+        };
+        await fetch("/api/config/ui", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+    } catch (e) {
+        console.warn("ui config save failed", e);
+    }
 }
 
 if (statsRankFilter) {
@@ -594,9 +874,16 @@ function init() {
     fetchOverview();
     fetchRanks();
     fetchStats();
+    fetchHelpopHistory();
+    fetchUiConfig();
 
     setInterval(fetchOverview, 5000);
+    setInterval(fetchJoins, 15000);
     setInterval(fetchStats, 10000);
+    setInterval(fetchHelpopHistory, 15000);
+
+    const saveBtn = document.getElementById("saveUiConfig");
+    saveBtn?.addEventListener("click", saveUiConfig);
 }
 
 window.addEventListener("load", init);

@@ -1,8 +1,10 @@
 package com.example.mcpanel.storage
 
+import com.example.mcpanel.model.HelpopEntry
 import com.example.mcpanel.model.PlayerStats
 import com.example.mcpanel.model.PluginData
 import com.example.mcpanel.model.Rank
+import com.example.mcpanel.model.WarEntry
 import com.google.gson.GsonBuilder
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
@@ -20,8 +22,8 @@ class DataService(private val plugin: JavaPlugin) {
 
     fun load(): Boolean {
         if (!dataFile.exists()) {
-            data = null
-            return false
+            createDefaultData()
+            return true
         }
         return runCatching {
             data = gson.fromJson(dataFile.readText(Charsets.UTF_8), PluginData::class.java)
@@ -61,13 +63,20 @@ class DataService(private val plugin: JavaPlugin) {
         save()
     }
 
+    fun ensureData(): PluginData {
+        if (data == null) {
+            createDefaultData()
+        }
+        return data!!
+    }
+
     fun createDefaultData() {
         val adminRank = Rank(
             name = "admin",
             color = "&c",
             prefix = "&c[ADMIN] ",
             priority = 0,
-            permissions = mutableListOf("*"),
+            permissions = mutableListOf("*", "mcpanel.helpop.receive", "mcpanel.anshelpop", "mcpanel.war"),
             displayName = "&c&lADMIN"
         )
         val vipRank = Rank(
@@ -88,7 +97,11 @@ class DataService(private val plugin: JavaPlugin) {
         )
         data = PluginData(
             ranks = mutableListOf(adminRank, vipRank, defaultRank),
-            players = mutableMapOf()
+            players = mutableMapOf(),
+            totalMessages = 0,
+            joinHistory = mutableListOf(),
+            helpopLog = mutableListOf(),
+            warLog = mutableListOf()
         )
         save()
     }
@@ -144,5 +157,39 @@ class DataService(private val plugin: JavaPlugin) {
         val removed = current.ranks.removeIf { it.name.equals(rankName, ignoreCase = true) }
         if (removed) save()
         return removed
+    }
+
+    fun recordJoin(timestamp: Long = System.currentTimeMillis()) {
+        val current = data ?: return
+        current.joinHistory.add(timestamp)
+        // trzymaj ostatnie 400 wpisów
+        while (current.joinHistory.size > 400) {
+            current.joinHistory.removeAt(0)
+        }
+        save()
+    }
+
+    fun incrementMessageCounter() {
+        val current = data ?: return
+        current.totalMessages += 1
+        save()
+    }
+
+    fun appendHelpop(entry: HelpopEntry) {
+        val current = data ?: return
+        current.helpopLog.add(entry)
+        while (current.helpopLog.size > 200) {
+            current.helpopLog.removeAt(0)
+        }
+        save()
+    }
+
+    fun appendWar(entry: WarEntry) {
+        val current = data ?: return
+        current.warLog.add(entry)
+        while (current.warLog.size > 200) {
+            current.warLog.removeAt(0)
+        }
+        save()
     }
 }

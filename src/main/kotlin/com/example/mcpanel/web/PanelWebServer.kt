@@ -1,8 +1,11 @@
 package com.example.mcpanel.web
 
-import com.example.mcpanel.storage.DataService
-import com.example.mcpanel.model.Rank
+import com.example.mcpanel.model.HelpopEntry
 import com.example.mcpanel.model.PlayerStats
+import com.example.mcpanel.model.Rank
+import com.example.mcpanel.model.WarEntry
+import com.example.mcpanel.storage.DataService
+import com.example.mcpanel.storage.PanelConfigService
 import io.ktor.http.*
 import io.ktor.serialization.gson.*
 import io.ktor.server.application.*
@@ -21,7 +24,8 @@ import org.slf4j.event.Level
 
 class PanelWebServer(
     private val plugin: JavaPlugin,
-    private val dataService: DataService
+    private val dataService: DataService,
+    private val panelConfig: PanelConfigService
 ) {
 
     private var server: ApplicationEngine? = null
@@ -88,19 +92,30 @@ class PanelWebServer(
                         return@get
                     }
 
+                    val totalBans = data?.players?.values?.sumOf { it.bans } ?: 0
+                    val totalWarns = data?.players?.values?.sumOf { it.warns } ?: 0
+                    val totalMsgs = data?.totalMessages ?: 0
+                    val helpopCount = data?.helpopLog?.size ?: 0
+                    val warCount = data?.warLog?.size ?: 0
+
                     call.respond(mapOf(
                         "onlinePlayers" to online,
                         "maxPlayers" to maxPlayers,
                         "tps" to String.format("%.2f", tps),
                         "rankCount" to (data?.ranks?.size ?: 0),
-                        "playerCount" to (data?.players?.size ?: 0)
+                        "playerCount" to (data?.players?.size ?: 0),
+                        "totalMessages" to totalMsgs,
+                        "totalBans" to totalBans,
+                        "totalWarns" to totalWarns,
+                        "helpopCount" to helpopCount,
+                        "warCount" to warCount
                     ))
                 }
 
                 // API: Lista rang
                 get("/api/ranks") {
                     dataService.reload() // Zawsze odświeżaj z pliku
-                    val ranks = dataService.data?.ranks ?: mutableListOf()
+                    val ranks = dataService.ensureData().ranks
                     call.respond(ranks)
                 }
 
@@ -127,8 +142,29 @@ class PanelWebServer(
                 // API: Lista graczy
                 get("/api/stats") {
                     dataService.reload() // Zawsze odświeżaj z pliku
-                    val players = dataService.data?.players?.values?.toList() ?: emptyList<PlayerStats>()
+                    val players = dataService.ensureData().players.values.toList()
                     call.respond(players)
+                }
+
+                // API: Historia wejść (timestampy)
+                get("/api/joins") {
+                    dataService.reload()
+                    val joins = dataService.data?.joinHistory ?: mutableListOf()
+                    call.respond(joins)
+                }
+
+                // API: Helpop log
+                get("/api/helpop") {
+                    dataService.reload()
+                    val log = dataService.ensureData().helpopLog
+                    call.respond(log.takeLast(100))
+                }
+
+                // API: War log
+                get("/api/warlog") {
+                    dataService.reload()
+                    val log = dataService.ensureData().warLog
+                    call.respond(log.takeLast(100))
                 }
 
                 // API: Ustaw rangę graczowi
@@ -190,12 +226,26 @@ class PanelWebServer(
                 // API: Pełne dane (dla synchronizacji)
                 get("/api/data") {
                     dataService.reload()
-                    val data = dataService.data
-                    if (data != null) {
-                        call.respond(data)
-                    } else {
-                        call.respond(HttpStatusCode.NotFound, mapOf("error" to "Brak danych"))
-                    }
+                    call.respond(dataService.ensureData())
+                }
+
+                // API: Config sidebar
+                get("/api/config/ui") {
+                    call.respond(
+                        mapOf(
+                            "sidebarEnabled" to panelConfig.sidebarEnabled,
+                            "sidebarTitle" to panelConfig.sidebarTitle,
+                            "sidebarAccent" to panelConfig.sidebarAccent
+                        )
+                    )
+                }
+                post("/api/config/ui") {
+                    val body = call.receive<Map<String, Any?>>()
+                    panelConfig.sidebarEnabled = body["sidebarEnabled"] as? Boolean ?: panelConfig.sidebarEnabled
+                    panelConfig.sidebarTitle = body["sidebarTitle"] as? String ?: panelConfig.sidebarTitle
+                    panelConfig.sidebarAccent = body["sidebarAccent"] as? String ?: panelConfig.sidebarAccent
+                    panelConfig.save()
+                    call.respond(mapOf("status" to "ok"))
                 }
             }
         }.start(wait = false)

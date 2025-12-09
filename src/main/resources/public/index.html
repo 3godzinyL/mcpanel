@@ -5,9 +5,11 @@
     <title>McPanel – Panel administratora</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 <div class="bg-block"></div>
+<div class="bg-glow"></div>
 
 <div class="hud">
     <div class="hud-item">
@@ -98,6 +100,33 @@
                         <span class="card-label">Zdefiniowanych rang</span>
                         <span class="card-value" id="ovRankCount">0</span>
                     </div>
+                    <div class="card-small">
+                        <span class="card-label">Łączna liczba wiadomości</span>
+                        <span class="card-value" id="ovMessages">0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">Bany (łączna liczba)</span>
+                        <span class="card-value" id="ovBans">0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">HELP-OP</span>
+                        <span class="card-value" id="ovHelpop">0</span>
+                    </div>
+                    <div class="card-small">
+                        <span class="card-label">WAR</span>
+                        <span class="card-value" id="ovWar">0</span>
+                    </div>
+                </div>
+
+                <div class="card-large">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-label">Status serwera</div>
+                            <div class="card-title">Liczba graczy (live)</div>
+                        </div>
+                        <div class="card-badge">Live</div>
+                    </div>
+                    <canvas id="onlineChart" height="160"></canvas>
                 </div>
             </section>
 
@@ -111,6 +140,9 @@
                         </select>
                     </label>
                     <input type="text" id="statsSearch" placeholder="Szukaj po nicku...">
+                </div>
+                <div class="filters">
+                    <div id="statsRankChecks" class="checks-row"></div>
                 </div>
                 <div class="table-wrapper">
                     <table>
@@ -129,6 +161,31 @@
                         <tbody id="statsTableBody">
                         </tbody>
                     </table>
+                </div>
+                <div id="playerDrawer" class="drawer">
+                    <div class="drawer-left">
+                        <img id="drawerAvatar" alt="avatar gracza">
+                        <div class="drawer-name" id="drawerName"></div>
+                        <div class="drawer-rank" id="drawerRank"></div>
+                        <div class="drawer-bars" id="drawerBars"></div>
+                    </div>
+                    <div class="drawer-right">
+                        <div class="drawer-grid">
+                            <div><span>Kill</span><strong id="drawerKills">0</strong></div>
+                            <div><span>Zgony</span><strong id="drawerDeaths">0</strong></div>
+                            <div><span>Czas gry</span><strong id="drawerPlaytime">0</strong></div>
+                            <div><span>Bany</span><strong id="drawerBans">0</strong></div>
+                            <div><span>Muty</span><strong id="drawerMutes">0</strong></div>
+                            <div><span>Warny</span><strong id="drawerWarns">0</strong></div>
+                            <div><span>HELP-OP</span><strong id="drawerHelpop">0</strong></div>
+                            <div><span>WAR</span><strong id="drawerWar">0</strong></div>
+                        </div>
+                        <div class="drawer-actions">
+                            <select id="drawerRankSelect"></select>
+                            <button id="drawerAddRank">Nadaj rangę</button>
+                            <button id="drawerRemoveRank" class="ghost">Usuń (default)</button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -182,8 +239,40 @@ plugin.panel.open"></textarea>
 
             <section class="tab-content" id="tab-other">
                 <h2>Inne</h2>
-                <p>Tu możesz dodać kolejne opcje, integracje, logi, webhooki itp.</p>
-                <p>Backend panelu działa w Kotlinie / Ktor wewnątrz tego samego pluginu .jar.</p>
+                <div class="other-grid">
+                    <div class="card-small full">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-label">Panel boczny w grze</div>
+                                <div class="card-title">Konfiguracja HUD</div>
+                            </div>
+                        </div>
+                        <div class="other-form">
+                            <label class="switch-row">
+                                <input type="checkbox" id="toggleSidebar">
+                                <span>Włącz/wyłącz panel po prawej</span>
+                            </label>
+                            <label>
+                                Tytuł
+                                <input type="text" id="sidebarTitle" placeholder="McPanel">
+                            </label>
+                            <label>
+                                Kolor akcentu (&kody lub HEX)
+                                <input type="text" id="sidebarAccent" placeholder="&b">
+                            </label>
+                            <button id="saveUiConfig">Zapisz ustawienia</button>
+                        </div>
+                    </div>
+                    <div class="card-small full">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-label">Historia HELPOP</div>
+                                <div class="card-title">Ostatnie zgłoszenia</div>
+                            </div>
+                        </div>
+                        <ul id="helpopHistory" class="history-list"></ul>
+                    </div>
+                </div>
             </section>
         </div>
     </div>
